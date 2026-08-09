@@ -1,6 +1,12 @@
 # === Temp / scratch files ===
 temp/
 
+# === Kiro IDE 設定（環境固有・機密情報を含む可能性あり）===
+.kiro/settings/
+
+# === CDK デプロイ出力（自動生成）===
+infra/output.json
+
 # === Python ===
 __pycache__/
 *.py[cod]
