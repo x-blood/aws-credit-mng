@@ -1,0 +1,47 @@
+# === Temp / scratch files ===
+temp/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+.Python
+.venv/
+venv/
+env/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# === Node.js / CDK ===
+node_modules/
+cdk.out/
+dist/
+*.js.map
+*.d.ts
+
+# CDK context（デプロイ時に自動生成される。機密情報が含まれる可能性があるため除外）
+cdk.context.json
+
+# === AWS ===
+# 認証情報・シークレットは絶対にコミットしない
+.env
+.env.*
+*.pem
+credentials
+
+# === IDE / OS ===
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+
+# === aidlc-docs（AI-DLC ワークフロードキュメント。公開不要の場合はコメントアウトを外す）===
+# aidlc-docs/
