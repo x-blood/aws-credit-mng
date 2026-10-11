@@ -6,13 +6,13 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
 
 from monthly_notifier.handler import _build_monthly_blocks, _summarize_credits
-from tests.conftest import make_credit, make_history_record
+from tests.conftest import days_from_now, make_credit
 
 
 # ---------------------------------------------------------------------------
@@ -23,8 +23,8 @@ class TestSummarizeCredits:
     def test_sums_active_remaining_only(self):
         # ENABLED かつ有効期限内（cr-001）と ENABLED だが期限切れ（cr-002）
         credits = [
-            make_credit("cr-001", status="ENABLED", remaining=3000.0, end_date="2026-12-31 00:00:00+00:00"),
-            make_credit("cr-002", status="ENABLED", remaining=500.0, end_date="2025-01-01 00:00:00+00:00"),  # 期限切れ
+            make_credit("cr-001", status="ENABLED", remaining=3000.0, end_date=days_from_now(365)),
+            make_credit("cr-002", status="ENABLED", remaining=500.0, end_date=days_from_now(-30)),  # 期限切れ
         ]
         summary = _summarize_credits(credits)
         assert summary["total_remaining"] == 3000.0  # BR-01: 期限切れは除外
@@ -38,11 +38,11 @@ class TestSummarizeCredits:
 
     def test_nearest_expiry_selects_earliest(self):
         credits = [
-            make_credit("cr-001", end_date="2026-12-31 00:00:00+00:00"),
-            make_credit("cr-002", end_date="2026-09-15 00:00:00+00:00"),
+            make_credit("cr-001", end_date=days_from_now(365)),
+            make_credit("cr-002", end_date=days_from_now(30)),
         ]
         summary = _summarize_credits(credits)
-        assert summary["nearest_expiry"] == date(2026, 9, 15)  # BR-11
+        assert summary["nearest_expiry"] == (datetime.now(tz=timezone.utc) + timedelta(days=30)).date()  # BR-11
         assert summary["nearest_credit_id"] == "cr-002"
 
     def test_multiple_active_summed(self):
@@ -55,7 +55,7 @@ class TestSummarizeCredits:
         assert summary["credit_count"] == 2
 
     def test_includes_estimated_amount(self):
-        """推定残高・推定使用額がサマリーに含まれる"""
+        """推定残高・未確定の使用見込みがサマリーに含まれる"""
         credits = [make_credit("cr-001", remaining=500.0)]
         # estimatedAmount を 477.10 に設定する
         credits[0]["estimatedAmount"] = {"currencyCode": "USD", "currencyAmount": "477.10"}
@@ -81,41 +81,10 @@ class TestBuildMonthlyBlocks:
         }
 
     def test_includes_header_and_divider(self):
-        blocks = _build_monthly_blocks(self._make_summary(), [], False, [])
+        blocks = _build_monthly_blocks(self._make_summary())
         types = [b["type"] for b in blocks]
         assert "header" in types
         assert "divider" in types
-
-    def test_no_partial_warning_when_false(self):
-        blocks = _build_monthly_blocks(self._make_summary(), [], False, [])
-        texts = [
-            b.get("text", {}).get("text", "") for b in blocks if b["type"] == "section"
-        ]
-        assert not any("不完全" in t for t in texts)
-
-    def test_partial_warning_included_when_true(self):
-        blocks = _build_monthly_blocks(self._make_summary(), [], True, ["2026-04"])  # BR-06
-        texts = [
-            b.get("text", {}).get("text", "") for b in blocks if b["type"] == "section"
-        ]
-        assert any("不完全" in t for t in texts)
-        assert any("2026-04" in t for t in texts)
-
-    def test_history_records_shown(self):
-        history = [make_history_record(billing_month="2026-05", amount=200.0)]
-        blocks = _build_monthly_blocks(self._make_summary(), history, False, [])
-        texts = [
-            b.get("text", {}).get("text", "") for b in blocks if b["type"] == "section"
-        ]
-        assert any("2026-05" in t for t in texts)
-
-    def test_estimated_bill_labeled(self):
-        history = [make_history_record(billing_month="2026-06", is_estimated=True)]
-        blocks = _build_monthly_blocks(self._make_summary(), history, False, [])
-        texts = [
-            b.get("text", {}).get("text", "") for b in blocks if b["type"] == "section"
-        ]
-        assert any("見込み" in t for t in texts)
 
 
 # ---------------------------------------------------------------------------
@@ -125,11 +94,8 @@ class TestBuildMonthlyBlocks:
 class TestMonthlyHandler:
     def test_handler_sends_message(self, lambda_env):
         credits = [make_credit()]
-        history = [make_history_record()]
 
         with patch("monthly_notifier.handler.get_credits", return_value=credits), \
-             patch("monthly_notifier.handler.get_credit_allocation_history",
-                   return_value=(history, False, [])), \
              patch("monthly_notifier.handler.get_channel_id", return_value="C0TEST1234"), \
              patch("monthly_notifier.handler.post_message") as mock_post:
             from monthly_notifier.handler import handler
@@ -142,8 +108,6 @@ class TestMonthlyHandler:
     def test_handler_propagates_slack_error(self, lambda_env):
         from common.slack_client import SlackApiError
         with patch("monthly_notifier.handler.get_credits", return_value=[make_credit()]), \
-             patch("monthly_notifier.handler.get_credit_allocation_history",
-                   return_value=([], False, [])), \
              patch("monthly_notifier.handler.get_channel_id", return_value="C0TEST1234"), \
              patch("monthly_notifier.handler.post_message",
                    side_effect=SlackApiError("channel_not_found")):

@@ -80,23 +80,12 @@ describe('Lambda Functions', () => {
     });
   });
 
-  test('monthly_notifier に MONTHS_BACK 環境変数がある', () => {
-    template.hasResourceProperties('AWS::Lambda::Function', {
-      FunctionName: 'credit-notifier-monthly',
-      Environment: {
-        Variables: Match.objectLike({
-          MONTHS_BACK: '3',
-        }),
-      },
-    });
-  });
-
   test('threshold_checker に THRESHOLD_AMOUNT 環境変数がある', () => {
     template.hasResourceProperties('AWS::Lambda::Function', {
       FunctionName: 'credit-notifier-threshold',
       Environment: {
         Variables: Match.objectLike({
-          THRESHOLD_AMOUNT: '1000.0',
+          THRESHOLD_AMOUNT: '20.0',
         }),
       },
     });
@@ -146,7 +135,6 @@ describe('IAM Policy', () => {
           Match.objectLike({
             Action: Match.arrayWith([
               'billing:GetCredits',
-              'billing:GetCreditAllocationHistory',
               'aws-portal:ViewBilling',
             ]),
             Effect: 'Allow',
