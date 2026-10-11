@@ -53,7 +53,6 @@ export class CreditNotifierStack extends cdk.Stack {
       effect: iam.Effect.ALLOW,
       actions: [
         'billing:GetCredits',
-        'billing:GetCreditAllocationHistory',
         'aws-portal:ViewBilling',
       ],
       resources: ['*'],
@@ -141,10 +140,6 @@ export class CreditNotifierStack extends cdk.Stack {
       code: lambda.Code.fromAsset(srcDir, { bundling: makeBundling(srcDir) }),
       handler: 'monthly_notifier.handler.handler',
       logGroup: makeLogGroup('credit-notifier-monthly'),
-      environment: {
-        ...commonLambdaProps.environment,
-        MONTHS_BACK: '3',
-      },
     });
 
     // ---- threshold_checker Lambda ----

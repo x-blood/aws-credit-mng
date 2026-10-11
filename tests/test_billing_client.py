@@ -14,10 +14,9 @@ from botocore.exceptions import ClientError
 
 from common.billing_client import (
     _retry_with_backoff,
-    get_credit_allocation_history,
     get_credits,
 )
-from tests.conftest import make_credit, make_history_record
+from tests.conftest import make_credit
 
 
 # ---------------------------------------------------------------------------
@@ -98,53 +97,3 @@ class TestGetCredits:
             call_kwargs = mock_boto.get_credits.call_args[1]
         assert call_kwargs["payerAccountFlag"] is True
 
-
-# ---------------------------------------------------------------------------
-# get_credit_allocation_history
-# ---------------------------------------------------------------------------
-
-class TestGetCreditAllocationHistory:
-    def test_returns_records_without_pagination(self):
-        record = make_history_record()
-        mock_response = {
-            "creditAllocationHistoryList": [record],
-            "partialResults": False,
-            "failedMonths": [],
-        }
-        with patch("common.billing_client._get_client") as mock_client_factory:
-            mock_client_factory.return_value.get_credit_allocation_history.return_value = mock_response
-            records, partial, failed = get_credit_allocation_history("123456789012")
-        assert records == [record]
-        assert partial is False
-        assert failed == []
-
-    def test_handles_pagination(self):
-        page1 = {
-            "creditAllocationHistoryList": [make_history_record(billing_month="2026-05")],
-            "partialResults": False,
-            "failedMonths": [],
-            "nextToken": "token-abc",
-        }
-        page2 = {
-            "creditAllocationHistoryList": [make_history_record(billing_month="2026-06")],
-            "partialResults": False,
-            "failedMonths": [],
-        }
-        with patch("common.billing_client._get_client") as mock_client_factory:
-            mock_boto = mock_client_factory.return_value
-            mock_boto.get_credit_allocation_history.side_effect = [page1, page2]
-            records, partial, failed = get_credit_allocation_history("123456789012")
-        assert len(records) == 2
-        assert mock_boto.get_credit_allocation_history.call_count == 2
-
-    def test_reports_partial_results(self):
-        mock_response = {
-            "creditAllocationHistoryList": [],
-            "partialResults": True,
-            "failedMonths": ["2026-04"],
-        }
-        with patch("common.billing_client._get_client") as mock_client_factory:
-            mock_client_factory.return_value.get_credit_allocation_history.return_value = mock_response
-            records, partial, failed = get_credit_allocation_history("123456789012")
-        assert partial is True
-        assert failed == ["2026-04"]

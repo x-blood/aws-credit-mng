@@ -2,6 +2,7 @@
 Shared pytest fixtures for Unit-1 Lambda tests.
 """
 import os
+from datetime import datetime, timedelta, timezone
 
 import boto3
 import pytest
@@ -29,7 +30,6 @@ def lambda_env(monkeypatch):
     monkeypatch.setenv("SLACK_BOT_TOKEN_PARAM", "/credit-notifier/slack-bot-token")
     monkeypatch.setenv("SLACK_CHANNEL_ID_PARAM", "/credit-notifier/slack-channel-id")
     monkeypatch.setenv("THRESHOLD_AMOUNT", "1000.0")
-    monkeypatch.setenv("MONTHS_BACK", "3")
 
 
 # ---------------------------------------------------------------------------
@@ -60,13 +60,21 @@ def secrets_manager_with_slack(lambda_env):
 # Sample credit data helpers
 # ---------------------------------------------------------------------------
 
+def days_from_now(days: int) -> str:
+    """今日から days 日後の日時を、実 API 形式（スペース区切り）の文字列で返す。"""
+    dt = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    return str(dt + timedelta(days=days))
+
+
 def make_credit(
     credit_id: str = "cr-001",
     status: str = "ENABLED",
     remaining: float = 5000.0,
-    end_date: str = "2026-12-31 00:00:00+00:00",  # 実 API のスペース区切り形式に合わせる
+    end_date: str | None = None,  # 省略時は1年後（実 API のスペース区切り形式）
 ) -> dict:
     """Return a minimal CreditData dict for testing."""
+    if end_date is None:
+        end_date = days_from_now(365)
     return {
         "creditId": credit_id,
         "creditStatus": status,
@@ -77,22 +85,4 @@ def make_credit(
         "endDate": end_date,
         "applicableProductNames": ["Amazon EC2"],
         "description": "Test credit",
-    }
-
-
-def make_history_record(
-    credit_id: str = "cr-001",
-    billing_month: str = "2026-06",
-    amount: float = 100.0,
-    is_estimated: bool = False,
-) -> dict:
-    """Return a minimal CreditAllocationHistory dict for testing."""
-    return {
-        "accountId": "123456789012",
-        "creditId": credit_id,
-        "billingMonth": billing_month,
-        "appliedServiceName": "Amazon EC2",
-        "creditAmount": {"currencyCode": "USD", "currencyAmount": str(amount)},
-        "isEstimatedBill": is_estimated,
-        "description": "Test allocation",
     }

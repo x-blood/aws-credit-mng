@@ -14,7 +14,7 @@ AWS Credits Detail Page API（2026年6月発表）を活用し、クレジット
 
 | 通知 | スケジュール | 説明 |
 |---|---|---|
-| 月次レポート | 毎月1日 09:00 UTC | 確定残高・推定残高・推定使用額・適用履歴を Slack に送信 |
+| 月次レポート | 毎月1日 09:00 UTC | 確定残高・推定残高（未確定分を反映）・未確定の使用見込みを Slack に送信 |
 | 閾値アラート | 毎日 00:00 UTC | 残高が閾値（デフォルト $20）を下回ったら送信 |
 | 期限切れアラート | 毎日 01:00 UTC | 30日以内に期限切れのクレジットを3段階で通知 |
 
@@ -133,7 +133,6 @@ Lambda 関数は以下の環境変数を参照します（CDK で自動設定）
 | `SLACK_BOT_TOKEN_PARAM` | ✅ | SSM パラメータ名（Bot Token） |
 | `SLACK_CHANNEL_ID_PARAM` | ✅ | SSM パラメータ名（Channel ID） |
 | `THRESHOLD_AMOUNT` | — | 閾値（USD）。デフォルト: `20.0` |
-| `MONTHS_BACK` | — | 適用履歴取得月数。デフォルト: `3` |
 
 ## 実装上の注意点
 
@@ -141,7 +140,6 @@ Lambda 関数は以下の環境変数を参照します（CDK で自動設定）
 
 - エンドポイントは `us-east-1` 固定
 - `GetCredits` にページネーターなし（全件一括返却）
-- `GetCreditAllocationHistory` にページネーターなし（手動 nextToken ループ必要）
 - SDK の自動リトライ未対応のため、`ThrottlingException` に対する指数バックオフを自前実装
 - `creditStatus` は `"ENABLED"` / `"DISABLED"` 等（`"ACTIVE"` ではない）
 - 日付フィールドは `"2027-11-30 23:59:59+00:00"`（スペース区切り）で返る（`T` 区切りではない）
@@ -156,4 +154,3 @@ Lambda 関数は以下の環境変数を参照します（CDK で自動設定）
 
 - [AWS Credits Detail Page ブログ](https://aws.amazon.com/blogs/aws-cloud-financial-management/introducing-the-aws-credits-detail-page/)
 - [Billing API リファレンス（GetCredits）](https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_billing_GetCredits.html)
-- [Billing API リファレンス（GetCreditAllocationHistory）](https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_billing_GetCreditAllocationHistory.html)
